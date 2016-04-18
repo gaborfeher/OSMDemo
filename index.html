@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"></meta>
+    <link rel="stylesheet" href="http://openlayers.org/en/v3.15.1/css/ol.css" type="text/css"></link>
+    <style>
+      #map {
+        height: 700px;
+        margin-left: 400px;
+        width: 1000px;
+        margin-top: 1%;
+        position: absolute;
+      }
+      #chart {
+        width: 400px;
+        position: absolute;
+        margin: 5px;
+      }
+
+      #chart rect {
+      /*  fill: steelblue;*/
+        fill: url(#img1);
+      }
+      #chart rect.pale {
+        fill: #edf3f8;
+      }
+
+      #chart text {
+        fill: black;
+        font: 12px sans-serif;
+        padding: 2px;
+      }
+
+      #chart text.right {
+        text-anchor: end;
+      }
+
+      #chart text.left {
+      }
+
+    </style>
+    <script src="http://openlayers.org/en/v3.15.1/build/ol.js" type="text/javascript"></script>
+    <script src="https://code.jquery.com/jquery-2.2.3.min.js" type="text/javascript"
+      integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+
+    <title>OpenLayers 3 example: Dogs of the IX. district</title>
+  </head>
+  <body>
+
+    <div class="btn-group" role="group" style="margin: 5px;">
+      <button id="backward-button" class="btn btn-default">
+        <i class="glyphicon glyphicon-menu-left"></i>
+      </button>
+      <span id="selected-street" class="btn btn-default" style="width: 200px;"></span>
+      <button id="forward-button" class="btn btn-default">
+        <i class="glyphicon glyphicon-menu-right"></i>
+      </button>
+    </div>
+    <br />
+    <svg id="chart" class="chart">
+      <defs>
+        <pattern id="img1" patternUnits="userSpaceOnUse" x="-10" y="-5" width="45" height="45">
+          <image xlink:href="puppy.jpg" width="45" height="45" />
+        </pattern>
+      </defs>
+    <svg>
+    <div id="map" class="map"></div>
+
+    <script type="text/javascript">
+      // Create map.
+      var map = new ol.Map({
+        target: 'map',
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          })
+        ],
+        view: new ol.View({
+          center: ol.proj.fromLonLat([19.0719389, 47.4810003]),
+          zoom: 13.5
+        })
+      });
+
+      // Change street selection on map:
+      var currentStreetLayer = undefined;
+      function setGeo(geoJson) {
+        if (currentStreetLayer) {
+          map.removeLayer(currentStreetLayer);
+        }
+
+        var vectorSource = new ol.source.Vector({
+          features: (new ol.format.GeoJSON()).readFeatures(geoJson, { featureProjection: 'EPSG:3857' } )
+        });
+
+        currentStreetLayer = new ol.layer.Vector({
+           source: vectorSource,
+           style: new ol.style.Style({
+               stroke: new ol.style.Stroke({
+                    color: 'rgba(255,0,0,0.5)',
+                    width: 5
+               })
+            })
+         })
+
+        map.addLayer(currentStreetLayer);
+      }
+
+      function setDogData(dogData, maxDogCount) {
+        dogData = dogData || [];
+
+        var width = 400,
+            barHeight = 30;
+
+        var x = d3.scale.linear()
+            .domain([0, maxDogCount])
+            .range([0, width / 2]);
+
+        var chart = d3.select("#chart")
+            .attr("width", width);
+
+        chart.attr("height", barHeight * dogData.length);
+
+        chart.selectAll("g").data([]).exit().remove();
+
+        var bar = chart.selectAll("g")
+            .data(dogData)
+            .enter()
+            .append("g")
+            .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; })
+
+        bar.append("rect")
+            .attr("width", function(d) { return x(d.value); })
+            .attr("height", barHeight - 1);
+
+        bar.append("rect")
+            .attr("class", "pale")
+            .attr("x", function(d) { return x(d.value) + 1; })
+            .attr("width", function(d) { return width - 25 - x(d.value); })
+            .attr("height", barHeight - 1);
+
+        bar.append("text")
+            .attr("class", "right")
+            .attr("x", width - 30)
+            .attr("y", barHeight / 2)
+            .attr("dy", ".35em")
+            .text(function(d) { return d.breed; });
+
+        bar.append("text")
+            .attr("class", "left")
+            .attr("x", function(d) { return x(d.value) + 3; } )
+            .attr("y", barHeight / 2)
+            .attr("dy", ".35em")
+            .text(function(d) { return d.value; });
+      }
+
+      $(document).ready(function() {
+        // Load dogs data:
+        $.get('data/dogs.csv', function(dogFile) {
+          var lines = dogFile.split('\n');
+          var breedNames = lines[0].split(',');
+          var dogData = {};
+          var maxDogCount = 0;
+          for (var i = 1; i < lines.length; ++i) {
+            var line = lines[i].split(',');
+            var lineData = [];
+            for (var j = 1; j < breedNames.length; ++j) {
+              if (line[j] != '') {
+                var count = parseInt(line[j]);
+                if (count && count > 0) {
+                  maxDogCount = Math.max(count, maxDogCount);
+                  lineData.push({
+                    breed: breedNames[j],
+                    value: parseInt(count)
+                  });
+                }
+              }
+            }
+            dogData[line[0]] = lineData;
+          }
+
+          // Load street data:
+          $.get('data/streetgeo.json', function(data) {
+            var streets = [];
+            for (key in data) {
+              if (data.hasOwnProperty(key)) {
+                streets.push(key);
+              }
+            }
+            streets.sort();
+            function selectStreet(pos) {
+              $('#selected-street').text(streets[pos]);
+              setGeo(data[streets[pos]]);
+              setDogData(dogData[streets[pos]], maxDogCount);
+            }
+            selectStreet(0);
+            var selectedStreet = 0;
+
+
+            // Define buttons.
+            $('#forward-button').click(function() {
+              selectedStreet = (selectedStreet + 1) % streets.length;
+              selectStreet(selectedStreet);
+            });
+
+            $('#backward-button').click(function() {
+              selectedStreet = (selectedStreet + streets.length - 1) % streets.length;
+              selectStreet(selectedStreet);
+            });
+
+          });
+        });
+
+      });
+    </script>
+  </body>
+</html>
+
