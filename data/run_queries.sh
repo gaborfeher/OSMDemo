@@ -10,10 +10,7 @@ while read STREET; do
   wget http://overpass-api.de/api/kill_my_queries -O /dev/null
   sleep 10
 
-# Use https://overpass-turbo.eu/ to construct such queries.
-# (Gets a street name of Budapest, IX. kerület. (That's the area(NNNN).)
-# Previous version:
-#   way["highway"="residential"]["name"="${STREET}"](area.searchArea);
+# Query to get a street name located in Budapest, 9th district.
   cat >post-file.txt <<EOF
 [out:xml][timeout:180];
 area(3601552462)->.searchArea;
@@ -29,3 +26,10 @@ EOF
   wget "http://overpass-api.de/api/interpreter" --post-file post-file.txt -O ${RESULT_FILE}.osm
 done <streets.txt
 
+# To obtain such queries, there are several possibilities, e.g.:
+# 1. Search and get the area code at http://www.openstreetmap.org/
+#    (Use "IX. kerület" as a name. Prepend 360 to the resulting id.)
+#    Substitute area code into this query.
+# 2. Use overpass-turbo.eu, go to Query Wizard
+#    Enter something like: name="Üllői út" in "IX. kerület"
+#    Export the query to text.
